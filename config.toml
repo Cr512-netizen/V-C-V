@@ -1,0 +1,12 @@
+[window]
+width = 1280
+height = 720
+vsync = true
+[runtime]
+tick_rate = 15
+threads = 0
+[render]
+renderer = "gl_mesh"
+clear_r = 0.035
+clear_g = 0.045
+clear_b = 0.065

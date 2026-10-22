@@ -1,0 +1,102 @@
+# Project roadmap and progress
+
+Percentages are engineering estimates, not additive and not a claim that the project is a finished game.
+
+## Current snapshot
+
+- **Engine/runtime foundations: ~72%** — C++20/CMake, fixed-step loop, logging/config/jobs, platform input/window, Lua mod lifecycle, world data structures, deterministic terrain, simulation systems, versioned saves and a deterministic rigid-body/destruction foundation are substantially implemented. Integration and production hardening remain.
+- **Playable game as a whole: ~42%** — the generated voxel world renders through the OpenGL 3.3 core path with GPU VAO/VBO/EBO meshes, GLSL 330 shaders, a free-fly camera and FPS logging. Phase B adds world-space DDA raycasting, sparse edit overrides, batched asynchronous chunk remeshing, and LMB break / RMB place. Phase C persists the world seed, sparse edits (including air overrides), ECS/inventory/work state, civilization state and Lua mod state in versioned saves. Phase D adds a rigid-body foundation, block fracture into debris and debris rendering; inventory UI, complete gameplay and UI remain absent. Nothing is playable as a game yet.
+- **Windows portable build: ~55%** — the current revision builds with MSVC, passes CTest, assembles a ZIP and uploads the artifact. A clean-machine launch and visual check is still required before calling the package production-ready.
+
+## Milestones
+
+| Milestone | Status | Estimate | Remaining work |
+|---|---|---:|---|
+| 1. Bootstrap/runtime | Implemented prototype | 85% | Integration hardening, runtime validation on clean Windows, production diagnostics |
+| 2.1 Materials and block registry | Implemented | 90% | Larger-data validation and content pipeline |
+| 2.2 CPU SVDAG | Prototype implemented | 70% | Profile large inputs, memory/performance improvements |
+| 2.3 Deterministic terrain chunks | Implemented prototype | 70% | Streaming, generation hooks and larger-world tests |
+| 3. Simulation and mod systems | Substantial systems implemented | 60% | Broader integration scenarios, balancing, runtime observability |
+| 4.1–4.5 Modding, automation, energy/fluids/fields and NPCs | Substantial implementation | 55% | End-to-end scenarios, error recovery, balancing and observability |
+| 4.6 / Phase C: world saves | **Complete** — version 2 sparse edits, legacy v1 snapshots, ECS/civilization/mod state, deterministic hash | 100% of this phase | Real-world migration testing and future format evolution |
+| 5. Phase A: visible GL voxel world | **Complete** — GLSL renderer, GPU chunk buffers, free-fly camera, FPS log | 30% of the full rendering roadmap | Camera polish, lighting/shadows, streaming and later Vulkan path |
+| 5. Phase B: dig and place | **Complete** — DDA, sparse voxel delta, dirty-chunk remeshing and mouse editing | 100% of this phase | Larger-world streaming remains later work |
+| 5. Phase C: world saves | **Complete** — v2 sparse edit saves, v1 compatibility, canonical state hash and 10k-edit round trip | 100% of this phase | Longer-duration real-world save/migration tests |
+| 5. Phase D: physics and destruction | **Implemented** — body/integrator/broadphase/narrowphase/solver/system, block fracture, per-chunk debris pool, ECS RigidBody persistence and shared-mesh debris rendering | 100% of this phase | Debris recycling, sleep wake on world change, interpolation of tick-spanning motion |
+| 6. Gameplay, UI and content | Early / not complete | 10% | Inventory UI, crafting, content and feedback |
+| 7. Packaging and release checks | CI package produced; clean-machine launch pending | 55% | Test on a Windows machine without developer tools, bundle/verify runtime dependencies, release checks |
+
+## Phase A verification
+
+- Specification and review: [`specs/01_phase.md`](specs/01_phase.md).
+- Linux Debug build: **success**, Ninja, ccache installed, ASan/UBSan enabled.
+- Linux CTest: **82/82 passed**. The OpenGL pixel smoke test ran under Xvfb and verified that a rendered test voxel changed a pixel from the clear color.
+- Windows MSVC build: **success**.
+- Windows CTest: **82/82 passed, 0 failed**. The OpenGL pixel smoke test was explicitly skipped because the hosted runner could not create the required hidden OpenGL context; Linux executed and passed it.
+- Windows ZIP artifact: uploaded by [the successful Windows workflow](https://github.com/Cr512-netizen/Nuc-lVuc-l/actions/runs/39142307082) — [download artifact](https://github.com/Cr512-netizen/Nuc-lVuc-l/actions/runs/39142307082/artifacts/12142361880).
+
+## Phase B verification
+
+- Specification and review: [`specs/02_phase.md`](specs/02_phase.md).
+- DDA tests cover axis hits, negative coordinates, origin-inside-solid, invalid rays, max distance and deterministic edge ties.
+- Delta tests cover sparse override lifecycle, explicit air overrides and chunk-local overlay without mutating the base chunk.
+- Chunk-manager tests cover negative coordinate mapping, edge-neighbor dirtying, per-tick batching and rejection of stale async mesh results.
+- Edit-mode tests cover place → query → break → query, breaking generated voxels into air overrides, misses and invalid placement.
+- Linux Debug CTest: **82/82 passed**.
+- Windows Release CTest: **82/82 passed**. The first Windows run exposed stack overflow from large chunk temporaries; snapshots were moved to heap storage and test chunks are now constructed directly in map storage. The final Windows run passed and uploaded the portable ZIP.
+- The Linux CI also measures a one-file incremental Ninja+ccache rebuild and fails if it takes 20 seconds or longer. The final Linux CI run measured the one-file incremental Ninja+ccache rebuild at **1,538 ms**, below the 20-second limit.
+
+## Phase C verification
+
+- Specification and review: [`specs/03_phase.md`](specs/03_phase.md).
+- Version 2 stores seed + sparse voxel edits, ECS/inventory/work state, civilization state and Lua mod state; version 1 chunk snapshots remain readable and are preserved during migration.
+- Tests cover sorted delta snapshots, explicit air overrides, duplicate/out-of-range edits, unknown versions, canonical hashing of edits/entities/civilizations/mod state, legacy v1 loading, base-chunk overlay and a 10,000-edit save/load round trip.
+- Linux Debug build: **success** with Ninja, ccache and ASan/UBSan; CTest **90/90 passed**. The GL pixel smoke test ran under Xvfb and passed.
+- Linux one-file incremental Ninja+ccache rebuild: **1,066 ms**, under the 20-second limit.
+- Windows MSVC build: **success**; CTest **90 tests, 0 failures**. The GL pixel smoke test was explicitly skipped because the hosted Windows runner could not create the required OpenGL context; Linux executed it successfully.
+- CI for the tested code commit [`ff0e141`](https://github.com/Cr512-netizen/Nuc-lVuc-l/commit/ff0e14104a6852c6f11f456d7dfdb8b7621a2e57): [Linux](https://github.com/Cr512-netizen/Nuc-lVuc-l/actions/runs/39148558780) · [Windows](https://github.com/Cr512-netizen/Nuc-lVuc-l/actions/runs/39148558722).
+- Windows ZIP artifact: [Nuc-lVuc-l-Windows-x64](https://github.com/Cr512-netizen/Nuc-lVuc-l/actions/runs/39148558722/artifacts/12144118567). It is a test package, not a finished game; clean-machine launch and visual validation remain pending.
+
+## Phase D verification
+
+- Specification and review: [`specs/04_phase.md`](specs/04_phase.md) — approved 2026-10-18.
+- Scope implemented: `physics/body`, `integrator`, `broadphase`, `narrowphase`, `solver`, `system`, `destruction`; `DebrisPool` per-chunk capacity; ECS `RigidBody` stable state traits and version 2 save/restore with transient force cleared; `EditMode` break callback; four-substep `PhysicsSystem` call from the existing 15 Hz tick; shared unit-cube debris mesh in the GL renderer.
+- Unit tests present and wired into `nuc_tests`: `test_physics_body`, `test_physics_integrator`, `test_physics_broadphase`, `test_physics_narrowphase`, `test_physics_solver`, `test_physics_system`, `test_destruction`, plus the physics-body save/hash case in `test_world_save` and the debris pixel assertion in `test_gl_smoke`. These cover every acceptance item 1–7 of the phase specification, including 296 boundary bodies / 216 collapsed interior cells, the per-chunk pool cap, four substeps per tick, sleep after five seconds and canonical-hash save round trip.
+- **Windows MSVC build: success; CTest 115/115 passed, 0 failed** (Release, MSVC 19.51.36260, CMake 4.3.1, Ninja, Lua 5.4.7 built locally as a static library; OpenGL pixel smoke tests included in the run). The count grew from the 107 registered before the audit: three regression tests cover the corrections below and five cover the E.0 determinism work. One pre-existing test, `forces wake bodies and transient force is excluded from stable ECS hash`, failed on the first run because it asserted that applying force leaves the ECS hash unchanged while starting from `awake=false`; since the spec both requires `apply_force` to wake the body and includes the persisted `awake` flag in the hash, the test was corrected to start awake and to assert the wake transition separately. No engine code was changed to make it pass.
+- **Linux ASan/UBSan CTest: not run for this revision.** The audit environment is Windows-only, so the sanitizer and Xvfb OpenGL legs of `.github/workflows/ci.yml` remain outstanding until CI runs on this commit.
+
+## Phase D post-implementation audit
+
+A static review of the merged Phase D code against `specs/04_phase.md` produced the following defect list. Items 1, 3 and 4 are corrected by the addendum in the specification and are covered by new unit tests; items 2, 5 and 6 are recorded as open work.
+
+1. **Render interpolation lagged three substeps.** `integrate` refreshed `previous_position` on every substep, so after four substeps it described the state one 1/60 s window back while `render_alpha` spans a whole 1/15 s tick. Fixed.
+2. **Debris pool capacity is never released.** `DebrisPool::release` has no caller: a chunk stops spawning debris after two broken blocks. Open — needs a debris lifetime decision that no approved specification covers.
+3. **Sleeping debris ignored the world.** `resolve_body_vs_voxels` returned early for sleeping bodies, so debris resting on a block that is later dug out hung in the air. Fixed by waking a sleeping body whose support voxels have been removed.
+4. **Material parameters were clamped inconsistently.** The solver clamped restitution but the voxel resolver used it raw, so a body with restitution above 1 gained energy on every voxel bounce. Fixed by sanitising at construction and in the voxel resolver.
+5. **Degenerate SAT normal.** `box_box_sat` derives its normal from the sign of the centre delta and returns an arbitrary direction when that delta is exactly zero. Latent: current debris uses 0.125 m microvoxels whose centres never coincide with a unit voxel centre. Open.
+6. **Edits were applied from the render callback, and the fracture seed mixed the frame-derived tick counter.** Deterministic replay therefore depended on frame timing. **Fixed as E.0** (see below).
+
+## E.0 — determinism prerequisites for networking
+
+The first two items of the E.0 section in [`specs/05_phase.md`](specs/05_phase.md) are implemented; the third is deliberately withheld pending review.
+
+- `app/edit_queue.{h,cpp}` (`EditRequestQueue`) buffers pointer rising edges observed once per frame and releases them, in order, inside the 15 Hz tick. `app/main.cpp` no longer calls `EditMode::apply` from the render lambda, so the number of applied edits no longer depends on the frame rate. The queue is bounded (`max_pending = 8`) so a stuck button cannot grow it without limit. Four tests in `tests/test_edit_queue.cpp` cover queuing, held-button suppression, frame-rate independence and the bound.
+- `physics::fracture_seed(world_seed, tick, x, y, z)` is a pure splitmix64 mix of exactly those four values, replacing the previous seed that XORed a frame-derived counter. One test in `tests/test_destruction.cpp` asserts that the seed is stable, that every input (including coordinate sign) changes it, and that identical seeds yield byte-identical debris.
+- **Not implemented:** `DebrisPool::release` still has no caller, because choosing a debris lifetime or chunk-unload policy is a design decision the review has not made.
+
+## Windows build gate
+
+1. MSVC CMake configure — passed.
+2. Build `nuc_app` and `nuc_tests` — passed.
+3. CTest — passed.
+4. Assemble portable directory — passed.
+5. Upload ZIP artifact — passed.
+6. Launch and visually smoke-test — **partially verified.** The Release build launches from the project source directory on this machine: Lua mods `core` and `example` load, the nine initial chunks emit chunk-load events, the GL context is created and chunk meshes reach video memory, and the process was still running with an intact loop after seven seconds of manual observation. Launching from the build directory instead exits immediately without diagnostics, because the mod and data paths are resolved relative to the working directory. A visual inspection on a clean Windows desktop is still outstanding.
+
+The current portable ZIP is a test build, not a finished game. Phases A, B, C and D are complete against their automated acceptance gates, with the Phase D build/test gate re-run and green after the audit corrections below. The Windows visual smoke test remains unverified on a real Windows desktop.
+
+## Next
+
+The Phase D gate is closed: the MSVC configure, build and the full 110-test CTest run all pass, and the Linux ASan/UBSan leg is the only remaining verification gap. `specs/05_phase.md` (Phase E, networking) is written and awaits review; it opens with an E.0 prerequisite section, because deterministic replication is untestable while edits are applied from the render callback and the fracture seed mixes a frame-driven counter.
+
+Phase E stays blocked until that specification is approved, and until E.0 makes input and randomness tick-driven. Open audit items 2 (debris lifetime), 5 (degenerate SAT normal) and half of 6 (tick-driven edits) are carried into that review rather than fixed speculatively.

@@ -1,0 +1,3 @@
+# Nuc-lVuc-l
+
+C++20 runtime/engine skeleton, now well into the voxel-world implementation. See [specs/01_bootstrap.md](specs/01_bootstrap.md) for setup and build instructions. Materials/blocks registry validation and a CPU SVDAG prototype, 32³ chunk storage, and deterministic FastNoiseLite terrain generation are implemented. The world renders through an OpenGL 3.3 core path with GPU chunk meshes, a free-fly camera and DDA dig/place editing; world saves are versioned and deterministic; and a rigid-body foundation with block fracture and debris exists. Vulkan raymarch rendering remains a later milestone. This is a test build, not a finished game. Build/test status is tracked by GitHub Actions.
