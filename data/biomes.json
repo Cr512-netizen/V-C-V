@@ -1,0 +1,4 @@
+[
+ {"id":"temperate","region_chunks":4,"resources":[{"id":10,"source_material":1,"chance":0.018,"vein_size":5,"min_y":2,"max_y":18}]},
+ {"id":"arid","region_chunks":4,"resources":[{"id":11,"source_material":1,"chance":0.012,"vein_size":3,"min_y":1,"max_y":10}]}
+]

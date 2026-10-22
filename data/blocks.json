@@ -1,0 +1,9 @@
+[
+  { "id": 0, "name": "air", "material_id": 0 },
+  { "id": 1, "name": "stone", "material_id": 1 },
+  { "id": 2, "name": "soil", "material_id": 2 },
+  { "id": 3, "name": "grass", "material_id": 3 },
+  { "id": 4, "name": "water", "material_id": 4 },
+  { "id": 10, "name": "copper_ore", "material_id": 10 },
+  { "id": 11, "name": "iron_ore", "material_id": 11 }
+]

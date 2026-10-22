@@ -1,0 +1,8 @@
+log.info("core mod initialized")
+registry.register("nuc.core.api", "1")
+world.set_voxel(0, 0, 0, 1)
+assert(world.get_voxel(0, 0, 0) == 1)
+events.on("mod_ready", function(payload)
+    log.info("received mod_ready event: " .. payload)
+end)
+events.emit("mod_ready", "core")

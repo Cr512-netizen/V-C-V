@@ -1,0 +1,3 @@
+[
+  {"id":"crush_ore","inputs":[{"item":1,"count":2}],"outputs":[{"item":2,"count":1}],"craft_ticks":3}
+]
