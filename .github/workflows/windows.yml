@@ -1,0 +1,94 @@
+name: Windows 11 build
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  windows-msvc:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build pinned Lua 5.4.8
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $deps = Join-Path $PWD "deps"
+          New-Item -ItemType Directory -Force $deps | Out-Null
+          $archive = Join-Path $deps "lua-5.4.8.tar.gz"
+          Invoke-WebRequest "https://www.lua.org/ftp/lua-5.4.8.tar.gz" -OutFile $archive
+          tar -xzf $archive -C $deps
+          $luaSrc = Join-Path $deps "lua-5.4.8/src"
+          Push-Location $luaSrc
+          try {
+            $sources = Get-ChildItem *.c | Where-Object { $_.Name -notin @("lua.c", "luac.c") }
+            foreach ($source in $sources) {
+              & cl.exe /nologo /c /MD /DLUA_USE_WINDOWS /I $luaSrc $source.FullName
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+            $objects = (Get-ChildItem *.obj).FullName
+            & lib.exe /nologo /OUT:lua54.lib $objects
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Pop-Location
+          }
+
+      - name: Configure MSVC build
+        shell: pwsh
+        run: |
+          $luaSrc = Join-Path $PWD "deps/lua-5.4.8/src"
+          $luaLib = Join-Path $luaSrc "lua54.lib"
+          cmake -S . -B build-windows -G "Visual Studio 17 2022" -A x64 -DLUA_INCLUDE_DIR="$luaSrc" -DLUA_LIBRARY="$luaLib" -DNUC_ENABLE_SANITIZERS=OFF -DNUC_BUILD_TESTS=ON
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build app and tests
+        shell: pwsh
+        run: |
+          cmake --build build-windows --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run C++ tests
+        shell: pwsh
+        run: |
+          ctest --test-dir build-windows -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Assemble portable app
+        shell: pwsh
+        run: |
+          $stage = Join-Path $PWD "package-windows"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item "build-windows/Release/nuc_app.exe" $stage
+          Copy-Item "config.toml" $stage
+          Copy-Item "data" $stage -Recurse
+          Copy-Item "mods" $stage -Recurse
+          Copy-Item "scripts" $stage -Recurse
+          @"
+          Nuc-lVuc-l portable build
+          =========================
+
+          Run nuc_app.exe from this folder. Keep data, mods, scripts and config.toml
+          beside the executable. The current renderer draws the generated voxel world with a free-fly camera. This is an early renderer milestone, not a finished game.
+
+          "@ | Set-Content (Join-Path $stage "RUN-ME.txt")
+          Compress-Archive -Path "$stage/*" -DestinationPath "Nuc-lVuc-l-Windows-x64.zip" -Force
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nuc-lVuc-l-Windows-x64
+          path: Nuc-lVuc-l-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14

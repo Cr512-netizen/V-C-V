@@ -1,0 +1,9 @@
+[
+  { "id": 0, "name": "air", "color": [0.0, 0.0, 0.0, 0.0], "flags": ["transparent"], "texture_path": "" },
+  { "id": 1, "name": "stone", "color": [0.48, 0.50, 0.53, 1.0], "flags": ["solid"], "texture_path": "textures/stone.png" },
+  { "id": 2, "name": "soil", "color": [0.39, 0.25, 0.14, 1.0], "flags": ["solid"], "texture_path": "textures/soil.png" },
+  { "id": 3, "name": "grass", "color": [0.25, 0.62, 0.22, 1.0], "flags": ["solid"], "texture_path": "textures/grass.png" },
+  { "id": 4, "name": "water", "color": [0.12, 0.35, 0.82, 0.65], "flags": ["transparent"], "texture_path": "textures/water.png" },
+  { "id": 10, "name": "copper_ore", "color": [0.72, 0.38, 0.20, 1.0], "flags": ["solid"], "texture_path": "textures/copper_ore.png" },
+  { "id": 11, "name": "iron_ore", "color": [0.64, 0.66, 0.69, 1.0], "flags": ["solid"], "texture_path": "textures/iron_ore.png" }
+]

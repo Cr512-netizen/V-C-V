@@ -1,0 +1,2 @@
+#include "core/jobs.h"
+namespace nuc {void Jobs::parallel_for(std::size_t n,const std::function<void(std::size_t)>& fn){struct Task:enki::ITaskSet{const std::function<void(std::size_t)>& f;explicit Task(const std::function<void(std::size_t)>& x):f(x){}void ExecuteRange(enki::TaskSetPartition r,uint32_t)override{for(auto i=r.start;i<r.end;++i)f(i);}} task(fn);task.m_SetSize=static_cast<uint32_t>(n);scheduler_.AddTaskSetToPipe(&task);scheduler_.WaitforTask(&task);}}

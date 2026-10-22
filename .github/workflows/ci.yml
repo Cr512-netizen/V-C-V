@@ -1,0 +1,36 @@
+name: CMake CI
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ git liblua5.4-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libwayland-dev libxkbcommon-dev libgl1-mesa-dev libgl1-mesa-dri xvfb ccache
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DNUC_ENABLE_SANITIZERS=ON
+      - name: Build
+        run: cmake --build build --parallel 2
+      - name: Verify incremental Ninja+ccache build under 20 seconds
+        shell: bash
+        run: |
+          touch world/raycast.cpp
+          start_ns=$(date +%s%N)
+          cmake --build build --parallel 2
+          elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
+          echo "Incremental Ninja+ccache rebuild: ${elapsed_ms} ms"
+          if [ "$elapsed_ms" -ge 20000 ]; then
+            echo "Incremental rebuild exceeded 20 seconds" >&2
+            exit 1
+          fi
+      - name: Test
+        run: xvfb-run -a ctest --test-dir build --output-on-failure

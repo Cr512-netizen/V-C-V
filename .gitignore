@@ -1,0 +1,8 @@
+build/
+build-*/
+logs/
+.cache/
+ccache/
+*.lib
+*.obj
+*.pdb

@@ -1,0 +1,4 @@
+#include "core/config.h"
+#include <toml++/toml.hpp>
+#include <algorithm>
+namespace nuc {Config Config::load(const std::string& p){Config c;auto t=toml::parse_file(p);if(auto v=t["window"]["width"].value<int>())c.width=std::clamp(*v,320,7680);if(auto v=t["window"]["height"].value<int>())c.height=std::clamp(*v,240,4320);if(auto v=t["window"]["vsync"].value<bool>())c.vsync=*v;if(auto v=t["runtime"]["tick_rate"].value<int>())c.tick_rate=std::clamp(*v,1,1000);if(auto v=t["runtime"]["threads"].value<int>())c.threads=static_cast<unsigned>(std::max(0,*v));if(auto v=t["render"]["renderer"].value<std::string>())c.renderer=*v;if(auto v=t["render"]["clear_r"].value<double>())c.clear_r=static_cast<float>(*v);if(auto v=t["render"]["clear_g"].value<double>())c.clear_g=static_cast<float>(*v);if(auto v=t["render"]["clear_b"].value<double>())c.clear_b=static_cast<float>(*v);return c;}}
