@@ -34,3 +34,33 @@ TEST_CASE("empty chunk produces no mesh") {
     REQUIRE(mesh.vertices.empty());
     REQUIRE(mesh.indices.empty());
 }
+TEST_CASE("every quad carries the full unit UV square") {
+    nuc::world::Chunk chunk;
+    chunk.set(1,1,1,1);
+    const auto mesh=nuc::render::build_chunk_mesh(chunk);
+    REQUIRE(mesh.vertices.size()==24);
+    for (std::size_t quad=0; quad<6; ++quad) {
+        bool seen[2][2]={};
+        for (std::size_t corner=0; corner<4; ++corner) {
+            const auto& vertex=mesh.vertices[quad*4+corner];
+            REQUIRE(vertex.u>=0.0F); REQUIRE(vertex.u<=1.0F);
+            REQUIRE(vertex.v>=0.0F); REQUIRE(vertex.v<=1.0F);
+            seen[vertex.u>0.5F?1:0][vertex.v>0.5F?1:0]=true;
+        }
+        REQUIRE(seen[0][0]); REQUIRE(seen[0][1]);
+        REQUIRE(seen[1][0]); REQUIRE(seen[1][1]);
+    }
+}
+TEST_CASE("UVs of one quad match its corner order, not the world axes") {
+    nuc::world::Chunk chunk;
+    chunk.set(0,0,0,1);
+    const auto mesh=nuc::render::build_chunk_mesh(chunk);
+    // The -X face spans z in [0,1] and y in [0,1]; its first corner sits at the
+    // origin of that plane, so the tile starts at uv (0,0) there.
+    const auto& first=mesh.vertices.front();
+    REQUIRE(first.u==0.0F);
+    REQUIRE(first.v==0.0F);
+    const auto& diagonal=mesh.vertices[2];
+    REQUIRE(diagonal.u==1.0F);
+    REQUIRE(diagonal.v==1.0F);
+}

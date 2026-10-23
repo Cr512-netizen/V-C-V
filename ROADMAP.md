@@ -90,9 +90,18 @@ The first two items of the E.0 section in [`specs/05_phase.md`](specs/05_phase.m
 - One command per step, no manual `-D` flags: `cmake --preset windows-release`, `cmake --build --preset windows-release`, `ctest --preset windows-release`. Presets also exist for `debug`, `release` and `windows-debug`; `tools/build-windows.ps1` drives them from a plain shell by entering `vcvars64` itself, and `tools/build.sh` / `tools/test.sh` did the same for POSIX shells.
 - Lua 5.4.6 is vendored from a pinned URL with a locally computed SHA-256, compiled as `nuc_lua` from an explicit 32-file source list and exposed as `Lua::Lua`; `-DUSE_SYSTEM_LUA=ON` switches to `find_package(Lua 5.4)`, and without a system Lua it fails with CMake's standard `Could NOT find Lua (missing: LUA_LIBRARIES LUA_INCLUDE_DIR)` pointing at `cmake/lua.cmake:18` — the vendored path is the default and the only one verified here.
 - Windows MSVC **Release: 115/115 CTest passed**, **Debug: 115/115 passed**, Windows-only host, CMake 4.3.1 + Ninja from Visual Studio 18.
-- One-file incremental rebuild (touch `world/chunk.cpp`): **1.6 s**, well under the 20-second limit.
+- One-file incremental rebuild (touch `world/chunk.cpp`): **0.14 s** with header tracking working, well under the 20-second limit.
+- **Header dependency tracking was silently dead on this host** and is now verified: the Russian MSVC prints a localized `/showIncludes` line, and CMake recorded that prefix into `CMakeFiles/rules.ninja` in the console code page. Under the default OEM code page 866 the recorded prefix is mojibake, so Ninja matched nothing and every object reported `#deps 0` — editing a header produced `ninja: no work to do`. Configuring under `chcp 65001` restores it (`#deps 2` on `chunk_mesh.cpp.obj`, header edits rebuild dependents); `VSLANG=1033` does not translate cl. `tools/build-windows.ps1` sets the code page and now fails the build if any `nuc_render` object reports zero dependencies. The earlier "1.6 s" incremental figure was measured while tracking was broken and has been replaced.
 - Two build-system bugs were found and fixed during the run: `FetchContent_Populate` publishes `<name>_SOURCE_DIR` into the calling scope, so wrapping it in a CMake function silently produced `/src/lapi.c` paths, and a `cmake_policy(PUSH)` left without its `POP` when a download failed replaced the real error with a bogus policy imbalance.
 - Fifteen tests failed on the first clean run for an environmental reason, not an engine one: they wrote scratch files to `%TEMP%`, and a sandboxed child process is confined to the workspace. They now use `tests/test_scratch.h` with `NUC_TEST_TMP_DIR` inside the build tree, which also makes them hermetic on CI runners.
+
+## Phase T verification (industrial textures)
+
+- Specification: [`specs/02_textures.md`](specs/02_textures.md).
+- Six procedural 32×32 tiles (stone, soil, grass, water, copper ore, iron ore) are generated at startup from `splitmix64` noise, packed into one `GL_TEXTURE_2D_ARRAY` layer per material, and sampled with `GL_NEAREST_MIPMAP_NEAREST`. No image files ship with the game; the style is riveted plate, rusted sheet, painted grate, coolant and ore-in-concrete.
+- Chunk meshes now carry per-face UVs oriented so the tile's up direction follows world +Y, and every vertex carries its material layer. The fragment shader keeps a `u_textured = 0` fallback to the old flat per-material colours, so a driver without texture-array support loses the art but not the game.
+- `windows-release`: **125/125 CTest passed** (8 texture cases, 2 mesh-UV cases), full application run clean, screenshot [`specs/img/textures_32.png`](specs/img/textures_32.png) — 687 distinct colours in frame against 119 for the previous flat shading.
+- Deferred on purpose: water stays opaque until Phase J sorts transparent faces.
 
 ## Windows build gate
 

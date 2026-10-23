@@ -8,6 +8,7 @@ namespace nuc::render {
 struct MeshVertex {
     float x{}, y{}, z{};
     float nx{}, ny{}, nz{};
+    float u{}, v{};
     std::uint32_t material{};
 };
 struct ChunkNeighbors {

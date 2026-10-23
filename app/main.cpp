@@ -238,9 +238,14 @@ int main() {
   std::vector<nuc::ChunkDraw> chunk_draws;
   std::map<std::pair<int,int>,std::size_t> gpu_mesh_indices;
   if (gl_renderer) {
+   std::vector<std::uint32_t> texture_materials;
+   texture_materials.reserve(registry.materials().size());
+   for (const auto& material : registry.materials()) texture_materials.push_back(material.id);
+   gl_renderer->load_textures(texture_materials);
    gpu_meshes.reserve(chunk_meshes.size());
    for (const auto& mesh : chunk_meshes) {
     nuc::render::gl::MeshUpload upload;
+    upload.set_atlas(gl_renderer->atlas());
     if (!upload.upload(mesh)) { renderer->shutdown(); nuc::log::error("Chunk GPU upload failed"); return 1; }
     gpu_meshes.push_back(std::move(upload));
    }
@@ -258,6 +263,7 @@ int main() {
    unit_cube_chunk.set(0,0,0,1);
    auto unit_cube_cpu=nuc::render::build_chunk_mesh(unit_cube_chunk);
    for(auto& vertex:unit_cube_cpu.vertices)vertex.material=0;
+   debris_mesh.set_atlas(gl_renderer->atlas());
    if(!debris_mesh.upload(unit_cube_cpu)){renderer->shutdown();nuc::log::error("Debris cube GPU upload failed");return 1;}
    gl_renderer->set_bodies(&body_draws,&debris_mesh);
    gl_renderer->set_view_projection(camera.view_projection());

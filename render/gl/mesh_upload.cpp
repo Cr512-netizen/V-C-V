@@ -11,7 +11,7 @@ constexpr GLenum array_buffer = 0x8892;
 constexpr GLenum element_buffer = 0x8893;
 constexpr GLenum static_draw = 0x88E4;
 constexpr GLenum float_type = 0x1406;
-struct GpuVertex { float position[3]; float normal[3]; float color[3]; };
+struct GpuVertex { float position[3]; float normal[3]; float uv[2]; float layer; float color[3]; };
 std::array<float,3> color(std::uint32_t id) {
     if(id==0)return {1.0F,1.0F,1.0F};
     switch (id) {
@@ -40,7 +40,9 @@ bool MeshUpload::upload(const ::nuc::render::ChunkMesh& mesh) {
     vertices.reserve(mesh.vertices.size());
     for (const auto& v:mesh.vertices) {
         const auto c=color(v.material);
-        vertices.push_back({{v.x,v.y,v.z},{v.nx,v.ny,v.nz},{c[0],c[1],c[2]}});
+        const int layer=atlas_?atlas_->layer(v.material):-1;
+        vertices.push_back({{v.x,v.y,v.z},{v.nx,v.ny,v.nz},{v.u,v.v},
+            static_cast<float>(layer<0?0:layer),{c[0],c[1],c[2]}});
     }
     GLuint new_vao=0,new_vbo=0,new_ebo=0;
     while(glGetError()!=GL_NO_ERROR) {}
@@ -62,8 +64,12 @@ bool MeshUpload::upload(const ::nuc::render::ChunkMesh& mesh) {
     g.enable_vertex_attrib_array(0);
     g.vertex_attrib_pointer(1,3,float_type,GL_FALSE,sizeof(GpuVertex),reinterpret_cast<void*>(sizeof(float)*3));
     g.enable_vertex_attrib_array(1);
-    g.vertex_attrib_pointer(2,3,float_type,GL_FALSE,sizeof(GpuVertex),reinterpret_cast<void*>(sizeof(float)*6));
+    g.vertex_attrib_pointer(2,2,float_type,GL_FALSE,sizeof(GpuVertex),reinterpret_cast<void*>(sizeof(float)*6));
     g.enable_vertex_attrib_array(2);
+    g.vertex_attrib_pointer(3,1,float_type,GL_FALSE,sizeof(GpuVertex),reinterpret_cast<void*>(sizeof(float)*8));
+    g.enable_vertex_attrib_array(3);
+    g.vertex_attrib_pointer(4,3,float_type,GL_FALSE,sizeof(GpuVertex),reinterpret_cast<void*>(sizeof(float)*9));
+    g.enable_vertex_attrib_array(4);
     g.bind_vertex_array(0);
     const GLenum error=glGetError();
     if (error!=GL_NO_ERROR) {

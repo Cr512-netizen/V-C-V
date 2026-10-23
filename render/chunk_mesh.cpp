@@ -6,17 +6,27 @@
 namespace nuc::render {
 namespace {
 using Point = std::array<float, 3>;
+using Uv = std::array<float, 2>;
 struct Face {
     Point normal;
     std::array<Point, 4> corners;
+    // Corner UVs chosen so the tile's up direction follows world +Y wherever the
+    // face allows it: neighbouring blocks then line up instead of rotating.
+    std::array<Uv, 4> uv;
 };
 constexpr Face faces[] = {
-    {{-1,0,0}, {Point{0,0,0}, Point{0,0,1}, Point{0,1,1}, Point{0,1,0}}},
-    {{ 1,0,0}, {Point{1,0,0}, Point{1,1,0}, Point{1,1,1}, Point{1,0,1}}},
-    {{0,-1,0}, {Point{0,0,0}, Point{1,0,0}, Point{1,0,1}, Point{0,0,1}}},
-    {{0, 1,0}, {Point{0,1,0}, Point{0,1,1}, Point{1,1,1}, Point{1,1,0}}},
-    {{0,0,-1}, {Point{0,0,0}, Point{0,1,0}, Point{1,1,0}, Point{1,0,0}}},
-    {{0,0, 1}, {Point{0,0,1}, Point{1,0,1}, Point{1,1,1}, Point{0,1,1}}}
+    {{-1,0,0}, {Point{0,0,0}, Point{0,0,1}, Point{0,1,1}, Point{0,1,0}},
+     {Uv{0,0}, Uv{1,0}, Uv{1,1}, Uv{0,1}}},
+    {{ 1,0,0}, {Point{1,0,0}, Point{1,1,0}, Point{1,1,1}, Point{1,0,1}},
+     {Uv{0,0}, Uv{0,1}, Uv{1,1}, Uv{1,0}}},
+    {{0,-1,0}, {Point{0,0,0}, Point{1,0,0}, Point{1,0,1}, Point{0,0,1}},
+     {Uv{0,0}, Uv{1,0}, Uv{1,1}, Uv{0,1}}},
+    {{0, 1,0}, {Point{0,1,0}, Point{0,1,1}, Point{1,1,1}, Point{1,1,0}},
+     {Uv{0,0}, Uv{0,1}, Uv{1,1}, Uv{1,0}}},
+    {{0,0,-1}, {Point{0,0,0}, Point{0,1,0}, Point{1,1,0}, Point{1,0,0}},
+     {Uv{0,0}, Uv{0,1}, Uv{1,1}, Uv{1,0}}},
+    {{0,0, 1}, {Point{0,0,1}, Point{1,0,1}, Point{1,1,1}, Point{0,1,1}},
+     {Uv{0,0}, Uv{1,0}, Uv{1,1}, Uv{0,1}}}
 };
 bool visible(const world::Chunk& chunk, const ChunkNeighbors& n,
              std::size_t x, std::size_t y, std::size_t z, std::size_t face) {
@@ -43,9 +53,12 @@ ChunkMesh build_chunk_mesh(const world::Chunk& chunk, const ChunkNeighbors& neig
             if (!visible(chunk,neighbors,x,y,z,f)) continue;
             const auto base=static_cast<std::uint32_t>(mesh.vertices.size());
             const auto& face=faces[f];
-            for (const auto& p:face.corners) {
+            for (std::size_t c=0; c<face.corners.size(); ++c) {
+                const auto& p=face.corners[c];
+                const auto& uv=face.uv[c];
                 mesh.vertices.push_back({static_cast<float>(x)+p[0],static_cast<float>(y)+p[1],
-                    static_cast<float>(z)+p[2],face.normal[0],face.normal[1],face.normal[2],material});
+                    static_cast<float>(z)+p[2],face.normal[0],face.normal[1],face.normal[2],
+                    uv[0],uv[1],material});
             }
             mesh.indices.insert(mesh.indices.end(),{base,base+1,base+2,base,base+2,base+3});
         }

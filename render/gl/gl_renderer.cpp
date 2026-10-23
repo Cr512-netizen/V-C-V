@@ -2,8 +2,8 @@
 #include "render/gl/gl_api.h"
 #include <GLFW/glfw3.h>
 #include <array>
-#include <iostream>
 #include <glm/gtc/matrix_transform.hpp>
+#include <iostream>
 #include <string>
 
 namespace nuc {
@@ -40,6 +40,41 @@ GLuint compile(GLenum type,const char* source) {
     }
     return shader;
 }
+constexpr const char* vertex_source=R"(#version 330 core
+layout(location=0) in vec3 a_position;
+layout(location=1) in vec3 a_normal;
+layout(location=2) in vec2 a_uv;
+layout(location=3) in float a_layer;
+layout(location=4) in vec3 a_color;
+uniform mat4 u_view_projection;
+uniform mat4 u_model;
+out vec3 v_color;
+out vec3 v_normal;
+out vec2 v_uv;
+flat out int v_layer;
+void main(){
+    gl_Position=u_view_projection*u_model*vec4(a_position,1.0);
+    v_color=a_color;
+    v_normal=mat3(u_model)*a_normal;
+    v_uv=a_uv;
+    v_layer=int(a_layer+0.5);
+})";
+// u_textured=0 keeps the pre-texture behaviour, so a driver without texture
+// entry points still draws the flat per-material colours from the vertex stream.
+constexpr const char* fragment_source=R"(#version 330 core
+in vec3 v_color;
+in vec3 v_normal;
+in vec2 v_uv;
+flat in int v_layer;
+out vec4 out_color;
+uniform vec3 u_tint;
+uniform sampler2DArray u_atlas;
+uniform int u_textured;
+void main(){
+    vec4 base = u_textured!=0 ? texture(u_atlas,vec3(v_uv,float(v_layer))) : vec4(v_color,1.0);
+    float light=0.35+0.65*max(dot(normalize(v_normal),normalize(vec3(0.4,0.85,0.3))),0.0);
+    out_color=vec4(base.rgb*u_tint*light,base.a);
+})";
 }
 bool GlRenderer::init() {
     auto& g=render::gl::api();
@@ -47,19 +82,7 @@ bool GlRenderer::init() {
     if (auto callback=reinterpret_cast<DebugMessageCallback>(glfwGetProcAddress("glDebugMessageCallback"))) {
         glEnable(debug_output); glEnable(debug_output_sync); callback(debug_message,nullptr);
     }
-    constexpr const char* vs=R"(#version 330 core
-layout(location=0) in vec3 a_position;
-layout(location=1) in vec3 a_normal;
-layout(location=2) in vec3 a_color;
-uniform mat4 u_view_projection;
-uniform mat4 u_model;
-out vec3 v_color;
-out vec3 v_normal;
-void main(){ gl_Position=u_view_projection*u_model*vec4(a_position,1.0); v_color=a_color; v_normal=mat3(u_model)*a_normal; })";
-    constexpr const char* fs=R"(#version 330 core
-in vec3 v_color; in vec3 v_normal; out vec4 out_color; uniform vec3 u_tint;
-void main(){ float light=0.35+0.65*max(dot(normalize(v_normal),normalize(vec3(0.4,0.85,0.3))),0.0); out_color=vec4(v_color*u_tint*light,1.0); })";
-    const GLuint v=compile(vertex_shader,vs), f=compile(fragment_shader,fs);
+    const GLuint v=compile(vertex_shader,vertex_source), f=compile(fragment_shader,fragment_source);
     if (!v || !f) { if(v)g.delete_shader(v); if(f)g.delete_shader(f); return false; }
     program_=g.create_program(); g.attach_shader(program_,v); g.attach_shader(program_,f); g.link_program(program_);
     g.delete_shader(v); g.delete_shader(f);
@@ -74,9 +97,17 @@ void main(){ float light=0.35+0.65*max(dot(normalize(v_normal),normalize(vec3(0.
     vp_location_=g.get_uniform_location(program_,"u_view_projection");
     model_location_=g.get_uniform_location(program_,"u_model");
     tint_location_=g.get_uniform_location(program_,"u_tint");
+    textured_location_=g.get_uniform_location(program_,"u_textured");
+    atlas_location_=g.get_uniform_location(program_,"u_atlas");
     glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL); glDisable(GL_CULL_FACE);
     glClearColor(0.48F,0.70F,0.91F,1.0F);
     return vp_location_>=0 && model_location_>=0 && tint_location_>=0;
+}
+void GlRenderer::load_textures(const std::vector<std::uint32_t>& materials) {
+    atlas_=render::build_atlas(materials);
+    if (!textures_.upload(atlas_)) {
+        std::cerr << "[OpenGL] texture array unavailable, falling back to flat colours\n";
+    }
 }
 void GlRenderer::resize(int width,int height) {
     width_=width>0?width:1; height_=height>0?height:1; glViewport(0,0,width_,height_);
@@ -88,6 +119,11 @@ void GlRenderer::begin_frame() {
     g.use_program(program_);
     g.uniform_matrix4fv(vp_location_,1,GL_FALSE,&view_projection_[0][0]);
     g.uniform3f(tint_location_,1.0F,1.0F,1.0F);
+    if (textured_location_>=0) g.uniform1i(textured_location_,textures_.ready()?1:0);
+    if (textures_.ready() && atlas_location_>=0) {
+        textures_.bind(0);
+        g.uniform1i(atlas_location_,0);
+    }
     if(chunks_) for (const auto& chunk:*chunks_) {
         if (!chunk.mesh || !chunk.mesh->ready()) continue;
         const glm::mat4 model=glm::translate(glm::mat4(1.0F),glm::vec3(chunk.origin_x,0.0F,chunk.origin_z));
@@ -106,7 +142,10 @@ void GlRenderer::begin_frame() {
 }
 void GlRenderer::end_frame() {}
 void GlRenderer::shutdown() {
+    textures_.reset();
+    atlas_=render::TextureAtlas{};
     if (program_) render::gl::api().delete_program(program_);
-    program_=0; chunks_=nullptr; bodies_=nullptr; unit_cube_=nullptr; vp_location_=model_location_=tint_location_=-1;
+    program_=0; chunks_=nullptr; bodies_=nullptr; unit_cube_=nullptr;
+    vp_location_=model_location_=tint_location_=textured_location_=atlas_location_=-1;
 }
 }

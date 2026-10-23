@@ -51,6 +51,7 @@ Write-Host "Preset     : $Preset"
 
 $steps = @(
     "cd /d `"$root`"",
+    "chcp 65001 >nul",
     "call `"$vcvars`" >nul",
     "cmake --preset $Preset",
     "cmake --build --preset $Preset"
@@ -63,6 +64,26 @@ $command = $steps -join " && "
 & cmd.exe /c $command
 if ($LASTEXITCODE -ne 0) {
     throw "Windows build failed with exit code $LASTEXITCODE."
+}
+
+# A non-English MSVC prints a localized "/showIncludes" line, and CMake records
+# that prefix in rules.ninja in the console code page. Under the default OEM
+# code page (866 on this machine) the recorded prefix turns into mojibake, Ninja
+# stops matching it and every build reports "no work to do" after a header edit.
+# Running the configure under UTF-8 keeps the prefix readable, so verify that the
+# generated build graph really tracks headers instead of trusting it.
+$buildDir = Join-Path $root "build/$Preset"
+$ninja = Join-Path $vsRoot "Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+$objectsRoot = Join-Path $buildDir "CMakeFiles\nuc_render.dir"
+$sample = Get-ChildItem -LiteralPath $objectsRoot -Filter "*.obj" -Recurse -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+if ($sample) {
+    $relative = $sample.FullName.Substring($buildDir.Length + 1)
+    $report = & $ninja -C $buildDir -t deps $relative 2>&1 | Select-Object -First 1
+    if ($report -match "#deps 0") {
+        throw "Header dependency tracking is broken for $relative (ninja reports 0 deps). Re-run the configure from a UTF-8 console: chcp 65001."
+    }
+    Write-Host "Dependency tracking: $report"
 }
 
 Write-Host "Windows build completed: build/$Preset"

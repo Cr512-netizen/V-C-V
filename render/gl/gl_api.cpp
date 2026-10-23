@@ -35,6 +35,15 @@ bool Api::load() noexcept {
     get_uniform_location = proc<GetUniformLocation>("glGetUniformLocation");
     uniform_matrix4fv = proc<UniformMatrix4fv>("glUniformMatrix4fv");
     uniform3f = proc<Uniform3f>("glUniform3f");
+    uniform1i = proc<Uniform1i>("glUniform1i");
+    active_texture = proc<ActiveTexture>("glActiveTexture");
+    gen_textures = proc<GenObjects>("glGenTextures");
+    delete_textures = proc<DeleteObjects>("glDeleteTextures");
+    bind_texture = proc<BindObject>("glBindTexture");
+    tex_image_3d = proc<TexImage3D>("glTexImage3D");
+    tex_parameteri = proc<TexParameteri>("glTexParameteri");
+    pixel_storei = proc<PixelStorei>("glPixelStorei");
+    generate_mipmap = proc<GenerateMipmap>("glGenerateMipmap");
     return gen_vertex_arrays && bind_vertex_array && delete_vertex_arrays &&
         gen_buffers && bind_buffer && delete_buffers && buffer_data &&
         vertex_attrib_pointer && enable_vertex_attrib_array && create_shader &&

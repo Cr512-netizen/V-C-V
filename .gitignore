@@ -6,3 +6,4 @@ ccache/
 *.lib
 *.obj
 *.pdb
+*.save

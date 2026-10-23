@@ -26,6 +26,13 @@ struct Api {
     using GetUniformLocation = GLint (APIENTRY*)(GLuint, const char*);
     using UniformMatrix4fv = void (APIENTRY*)(GLint, GLsizei, GLboolean, const GLfloat*);
     using Uniform3f = void (APIENTRY*)(GLint, GLfloat, GLfloat, GLfloat);
+    using Uniform1i = void (APIENTRY*)(GLint, GLint);
+    using ActiveTexture = void (APIENTRY*)(GLenum);
+    using TexImage3D = void (APIENTRY*)(GLenum, GLint, GLint, GLsizei, GLsizei, GLsizei, GLint, GLenum, GLenum,
+                                        const void*);
+    using TexParameteri = void (APIENTRY*)(GLenum, GLenum, GLint);
+    using PixelStorei = void (APIENTRY*)(GLenum, GLint);
+    using GenerateMipmap = void (APIENTRY*)(GLenum);
     GenObjects gen_vertex_arrays{};
     BindVertexArray bind_vertex_array{};
     DeleteObjects delete_vertex_arrays{};
@@ -51,7 +58,22 @@ struct Api {
     GetUniformLocation get_uniform_location{};
     UniformMatrix4fv uniform_matrix4fv{};
     Uniform3f uniform3f{};
+    Uniform1i uniform1i{};
+    ActiveTexture active_texture{};
+    GenObjects gen_textures{};
+    DeleteObjects delete_textures{};
+    BindObject bind_texture{};
+    TexImage3D tex_image_3d{};
+    TexParameteri tex_parameteri{};
+    PixelStorei pixel_storei{};
+    GenerateMipmap generate_mipmap{};
     bool load() noexcept;
+    // Texture entry points are optional: a driver that lacks them leaves the
+    // renderer on the flat-colour fallback instead of failing initialization.
+    [[nodiscard]] bool textures_available() const noexcept {
+        return gen_textures && delete_textures && bind_texture && tex_image_3d && tex_parameteri &&
+               pixel_storei && generate_mipmap && active_texture && uniform1i;
+    }
 };
 Api& api() noexcept;
-}
+} // namespace nuc::render::gl
