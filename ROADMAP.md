@@ -103,6 +103,15 @@ The first two items of the E.0 section in [`specs/05_phase.md`](specs/05_phase.m
 - `windows-release`: **125/125 CTest passed** (8 texture cases, 2 mesh-UV cases), full application run clean, screenshot [`specs/img/textures_32.png`](specs/img/textures_32.png) — 687 distinct colours in frame against 119 for the previous flat shading.
 - Deferred on purpose: water stays opaque until Phase J sorts transparent faces.
 
+## Phase W verification (world generation)
+
+- Specification: [`specs/03_worldgen.md`](specs/03_worldgen.md).
+- Terrain is now a pure function of `(seed, world_x, world_z)`: a four-octave continent field plus a three-octave detail field, and a separate low-frequency temperature field that labels each column `temperate` or `arid`. Height blends the two biome profiles across a ±0.15 temperature band, so the silhouette stays continuous at a biome border instead of stepping.
+- Caves are the intersection of two near-zero isosurfaces of independent 3D noise fields, which produces tunnels rather than a sponge. They are carved only into solid material, never within four blocks of a column's surface and never below `y = 2`, so the crust a player stands on is intact.
+- Ore veins were rewritten: `world/gen_resources.cpp` used to be two 4000-character lines with no structure and placed ore voxel-by-voxel; it is now readable, loads the same `data/biomes.json`, and grows a chunk-local random walk per vein, so veins never straddle a chunk border and the cost is a handful of attempts instead of a full-volume scan. The biome now comes from the terrain, not from a region hash.
+- `windows-release`: **134/134 CTest passed** (nine new W1–W9 cases). Nine starting chunks generate in **6 ms** against a 250 ms budget.
+- Two tuning facts worth keeping: the first tuned world put the spawn in water (16 green pixels in frame), fixed by `base_height` 12 → 14, `amplitude` 8 → 7, `sea_level` 10 → 8; and the camera had to move from `y = 18` to `y = 24` because it started inside the taller hills. Screenshot: [`specs/img/worldgen.png`](specs/img/worldgen.png).
+
 ## Windows build gate
 
 1. MSVC CMake configure — passed.

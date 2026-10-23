@@ -81,14 +81,16 @@ int main() {
   for(auto& chunk:nuc::save::WorldSave::decode_chunks(save_data.chunks))
    chunks.emplace(std::pair{chunk.chunk_x(),chunk.chunk_z()},std::move(chunk));
   const auto seed=static_cast<std::int32_t>(save_data.seed&0x7fffffffULL);
-  nuc::world::ChunkGenerator generator({seed,0.035F,12.0F,8.0F,10});
+  nuc::world::ChunkGenerator generator({.seed=seed});
   std::function<void(std::int32_t,std::int32_t)> chunk_loaded_callback;
   auto ensure_chunk=[&](std::int32_t cx,std::int32_t cz)->nuc::world::Chunk& {
    const auto key=std::pair{cx,cz};
    auto it=chunks.find(key);
    if(it==chunks.end()) {
     auto generated=generator.generate(cx,cz);
-    resource_generator.apply(generated,save_data.seed);
+    const auto center_x=static_cast<std::int64_t>(cx)*32+16;
+    const auto center_z=static_cast<std::int64_t>(cz)*32+16;
+    resource_generator.apply(generated,save_data.seed,generator.biome_at(center_x,center_z));
     it=chunks.emplace(key,std::move(generated)).first;
     if(chunk_loaded_callback) chunk_loaded_callback(cx,cz);
    }
@@ -210,7 +212,8 @@ int main() {
   if (config.renderer == "null") renderer = std::make_unique<nuc::NullRenderer>();
   else renderer = std::make_unique<nuc::GlRenderer>();
   auto* gl_renderer = dynamic_cast<nuc::GlRenderer*>(renderer.get());
-  nuc::Camera camera({16.0F, 18.0F, 40.0F},
+  // High enough to clear the tallest generated column (base 14 + amplitude).
+  nuc::Camera camera({16.0F, 24.0F, 40.0F},
    static_cast<float>(window.width()) / static_cast<float>(std::max(window.height(),1)));
   camera.set_rotation(-90.0F,-30.0F);
   if (!renderer->init()) { nuc::log::error("Renderer initialization failed"); return 1; }

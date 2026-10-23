@@ -1,41 +1,63 @@
 #include "world/generator.h"
-#include <FastNoiseLite.h>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
 namespace nuc::world {
-ChunkGenerator::ChunkGenerator(GeneratorSettings settings) : settings_(settings) {
+namespace {
+constexpr std::uint32_t air = 0;
+constexpr std::uint32_t stone = 1;
+constexpr std::uint32_t water = 4;
+constexpr int soil_depth = 3;    // blocks of subsurface material below the top
+constexpr int cave_crust = 4;    // never carve the top four blocks of a column
+constexpr int cave_floor = 2;    // never carve the bottom two blocks either
+}
+
+ChunkGenerator::ChunkGenerator(GeneratorSettings settings) : settings_(settings), shape_(settings), caves_(settings) {
     if (!std::isfinite(settings_.frequency) || settings_.frequency <= 0.0F)
         throw std::invalid_argument("Terrain noise frequency must be finite and positive");
     if (!std::isfinite(settings_.base_height) || !std::isfinite(settings_.amplitude) || settings_.amplitude < 0.0F)
         throw std::invalid_argument("Terrain height settings must be finite and amplitude non-negative");
     if (settings_.sea_level < 0 || settings_.sea_level >= static_cast<std::int32_t>(Chunk::extent))
         throw std::invalid_argument("Sea level must fit inside the chunk");
+    if (!std::isfinite(settings_.cave_density) || settings_.cave_density <= 0.0F || settings_.cave_density >= 0.5F)
+        throw std::invalid_argument("Cave density must be finite and inside (0, 0.5)");
 }
+
+Biome ChunkGenerator::biome_at(std::int64_t world_x, std::int64_t world_z) const {
+    return shape_.sample(world_x, world_z).biome;
+}
+
 Chunk ChunkGenerator::generate(std::int32_t chunk_x, std::int32_t chunk_z) const {
-    FastNoiseLite noise(settings_.seed);
-    noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    noise.SetFrequency(settings_.frequency);
     Chunk chunk(chunk_x, chunk_z);
     const std::int64_t origin_x = static_cast<std::int64_t>(chunk_x) * static_cast<std::int64_t>(Chunk::extent);
     const std::int64_t origin_z = static_cast<std::int64_t>(chunk_z) * static_cast<std::int64_t>(Chunk::extent);
+    const int top = static_cast<int>(Chunk::extent) - 1;
+
     for (std::size_t z = 0; z < Chunk::extent; ++z) {
         for (std::size_t x = 0; x < Chunk::extent; ++x) {
-            const auto wx = static_cast<float>(origin_x + static_cast<std::int64_t>(x));
-            const auto wz = static_cast<float>(origin_z + static_cast<std::int64_t>(z));
-            const auto height = static_cast<std::int32_t>(std::lround(settings_.base_height + noise.GetNoise(wx, wz) * settings_.amplitude));
-            const auto surface = std::clamp(height, 0, static_cast<int>(Chunk::extent) - 1);
-            for (std::size_t y = 0; y < Chunk::extent; ++y) {
-                std::uint32_t material = 0; // air
-                if (static_cast<int>(y) <= surface) {
-                    if (static_cast<int>(y) == surface) material = 3; // grass
-                    else if (static_cast<int>(y) >= surface - 3) material = 2; // soil
-                    else material = 1; // stone
-                } else if (static_cast<int>(y) <= settings_.sea_level) {
-                    material = 4; // water
+            const std::int64_t world_x = origin_x + static_cast<std::int64_t>(x);
+            const std::int64_t world_z = origin_z + static_cast<std::int64_t>(z);
+            const ColumnSample column = shape_.sample(world_x, world_z);
+            const int surface = std::clamp(static_cast<int>(std::lround(column.height)), 0, top);
+            const BiomeProfile profile = biome_profile(column.biome);
+            const bool submerged = surface <= settings_.sea_level;
+
+            for (int y = 0; y <= top; ++y) {
+                std::uint32_t material = air;
+                if (y <= surface) {
+                    if (y == surface) material = submerged ? profile.subsurface : profile.surface;
+                    else if (y >= surface - soil_depth) material = profile.subsurface;
+                    else material = stone;
+                } else if (y <= settings_.sea_level) {
+                    material = water;
                 }
-                chunk.voxels()[Chunk::index(x,y,z)] = material;
+                const bool carvable = material != air && material != water;
+                if (carvable && y >= cave_floor && y <= surface - cave_crust &&
+                    caves_.is_cave(world_x, y, world_z)) {
+                    material = air;
+                }
+                chunk.voxels()[Chunk::index(x, static_cast<std::size_t>(y), z)] = material;
             }
         }
     }

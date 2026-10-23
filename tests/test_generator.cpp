@@ -21,7 +21,7 @@ TEST_CASE("terrain generation is deterministic for a seed and coordinates") {
     REQUIRE(a.chunk_x() == -1);
     REQUIRE(a.chunk_z() == 2);
     REQUIRE(std::any_of(a.voxels().begin(), a.voxels().end(), [](auto v){ return v == 1; }));
-    REQUIRE(std::any_of(a.voxels().begin(), a.voxels().end(), [](auto v){ return v == 3; }));
+    REQUIRE(std::any_of(a.voxels().begin(), a.voxels().end(), [](auto v){ return v == 2 || v == 3; }));
 }
 TEST_CASE("terrain generation uses configured seed") {
     nuc::world::ChunkGenerator a({.seed=1});
