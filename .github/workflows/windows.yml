@@ -21,48 +21,36 @@ jobs:
         with:
           arch: x64
 
-      - name: Build pinned Lua 5.4.8
+      # CMakePresets.json uses Ninja. The image usually ships it, but checking
+      # keeps the failure readable instead of a bare "ninja was not found".
+      - name: Ensure Ninja
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $deps = Join-Path $PWD "deps"
-          New-Item -ItemType Directory -Force $deps | Out-Null
-          $archive = Join-Path $deps "lua-5.4.8.tar.gz"
-          Invoke-WebRequest "https://www.lua.org/ftp/lua-5.4.8.tar.gz" -OutFile $archive
-          tar -xzf $archive -C $deps
-          $luaSrc = Join-Path $deps "lua-5.4.8/src"
-          Push-Location $luaSrc
-          try {
-            $sources = Get-ChildItem *.c | Where-Object { $_.Name -notin @("lua.c", "luac.c") }
-            foreach ($source in $sources) {
-              & cl.exe /nologo /c /MD /DLUA_USE_WINDOWS /I $luaSrc $source.FullName
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            }
-            $objects = (Get-ChildItem *.obj).FullName
-            & lib.exe /nologo /OUT:lua54.lib $objects
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          } finally {
-            Pop-Location
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+            choco install ninja --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw "ninja could not be installed" }
           }
+          ninja --version
 
-      - name: Configure MSVC build
+      # No hand-built Lua any more: USE_SYSTEM_LUA is OFF and cmake/lua.cmake
+      # vendors Lua 5.4.6, the same source the local presets use.
+      - name: Configure through the windows-release preset
         shell: pwsh
         run: |
-          $luaSrc = Join-Path $PWD "deps/lua-5.4.8/src"
-          $luaLib = Join-Path $luaSrc "lua54.lib"
-          cmake -S . -B build-windows -G "Visual Studio 17 2022" -A x64 -DLUA_INCLUDE_DIR="$luaSrc" -DLUA_LIBRARY="$luaLib" -DNUC_ENABLE_SANITIZERS=OFF -DNUC_BUILD_TESTS=ON
+          cmake --preset windows-release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build app and tests
         shell: pwsh
         run: |
-          cmake --build build-windows --config Release --parallel 2
+          cmake --build --preset windows-release --parallel 2
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Run C++ tests
         shell: pwsh
         run: |
-          ctest --test-dir build-windows -C Release --output-on-failure
+          ctest --preset windows-release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Assemble portable app
@@ -70,7 +58,7 @@ jobs:
         run: |
           $stage = Join-Path $PWD "package-windows"
           New-Item -ItemType Directory -Force $stage | Out-Null
-          Copy-Item "build-windows/Release/nuc_app.exe" $stage
+          Copy-Item "build/windows-release/nuc_app.exe" $stage
           Copy-Item "config.toml" $stage
           Copy-Item "data" $stage -Recurse
           Copy-Item "mods" $stage -Recurse
