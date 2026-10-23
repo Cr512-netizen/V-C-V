@@ -5,6 +5,7 @@
 #include "sim/recipes.h"
 #include "sim/energy.h"
 #include "core/ecs/view.h"
+#include "test_scratch.h"
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -12,7 +13,7 @@
 #include <tuple>
 namespace {
 struct TempMods {
- std::filesystem::path root=std::filesystem::temp_directory_path()/"nuc_mod_loader_tests";
+ std::filesystem::path root=nuc::test::scratch_dir("mod_loader_tests");
  TempMods(){std::filesystem::remove_all(root);std::filesystem::create_directories(root);}
  ~TempMods(){std::error_code ec;std::filesystem::remove_all(root,ec);}
  void mod(const std::string& folder,const std::string& manifest,const std::string& script) {

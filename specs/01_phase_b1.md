@@ -72,7 +72,7 @@ option(USE_SYSTEM_LUA "Use a system Lua 5.4 instead of the vendored copy" OFF)
 - `USE_SYSTEM_LUA=ON` → `find_package(Lua 5.4 REQUIRED)`, target `Lua::Lua` = `INTERFACE` с `${LUA_INCLUDE_DIR}` и `${LUA_LIBRARIES}`.
 - `USE_SYSTEM_LUA=OFF` → `FetchContent_Declare(lua URL https://www.lua.org/ftp/lua-5.4.6.tar.gz URL_HASH SHA256=7D5EA1B9CB6AA0B59CA3DDE1C6ADCB57EF83A1BA8E5432C0ECD06BF439B3AD88)`.
   Хэш посчитан мной 2026-10-22 на скачанном файле (363 329 байт) — это не выдуманное значение.
-  В архиве **нет** `CMakeLists.txt`, поэтому `FetchContent_MakeAvailable` не применяется: только `FetchContent_Populate` и явный список из 33 файлов `src/*.c` (всё, кроме `lua.c`, `luac.c`, `onelua.c`).
+  В архиве **нет** `CMakeLists.txt`, поэтому `FetchContent_MakeAvailable` не применяется: только `FetchContent_Populate` и явный список из 32 файлов `src/*.c` (всё, кроме `lua.c`, `luac.c`, `onelua.c`).
   Цель: `add_library(lua_vendored STATIC ...)` + `add_library(Lua::Lua ALIAS lua_vendored)`, `PUBLIC` include на `${lua_SOURCE_DIR}/src`.
   Дефайны: `LUA_USE_WINDOWS` для MSVC, `LUA_USE_POSIX` для остальных (readline не нужен: он только в `lua.c`, который не собирается).
 
@@ -134,3 +134,21 @@ T4 и T1 — те самые критерии брифа (инкремент и 
 1. **Per-module `CMakeLists.txt`.** Бриф требует «верхний + per-module», но у модулей по 1–8 строк исходников: 8 файлов дадут boilerplate без выгоды. Предлагаю вместо этого `cmake/dependencies.cmake` + `cmake/lua.cmake` + один корневой файл. Если нужна буквальная структура — сделаю её.
 2. **`ColumnLimit: 120`** против гугловых 80 (обоснование в §6).
 3. **Разбиение `app/main.cpp` (338 строк) и `script/mod_loader.cpp` (221).** Это правило 2, но не буквально пункт B1. Предлагаю отдельной задачей `B1-refactor` сразу после пресетов, чтобы не смешивать механика-правки с форматированием.
+
+## 11. Результат (2026-10-23)
+
+| Проверка | Факт |
+|---|---|
+| `cmake --preset windows-release` + build + `ctest` | **115/115 passed**, 0 failed |
+| `cmake --preset windows-debug` + build + `ctest` | **115/115 passed**, 0 failed |
+| Инкрементальная пересборка одного файла | **1.6 с** (лимит 20 с) |
+| `-DUSE_SYSTEM_LUA=ON` без системной Lua | понятная ошибка `Could NOT find Lua (missing: LUA_LIBRARIES LUA_INCLUDE_DIR)` на `cmake/lua.cmake:18`; путь с системной Lua на этой машине проверить нечем |
+| Запуск из обычной оболочки | `tools/build-windows.ps1` сам находит `vcvars64`, `cmake`, `ninja`, `git` |
+
+Что сломалось по дороге и почему:
+
+1. `FetchContent_Populate` пишет `<name>_SOURCE_DIR` **в вызывающий scope**. Обёртка-функция `nuc_fetch_source()` молча давала пути вида `/src/lapi.c`. Убрана: populate вызывается прямо в файле, политика `CMP0169 OLD` ставится один раз на каталог.
+2. `cmake_policy(PUSH)` без `POP`: когда скачивание падало, FetchContent делал ранний `return` из функции, POP не выполнялся, и CMake сообщал о «policy imbalance» вместо настоящей ошибки.
+3. 15 тестов писали в `%TEMP%`, а дочерний процесс под песочницей ограничен workspace → `Access denied`. Введён `tests/test_scratch.h` с `NUC_TEST_TMP_DIR` внутри дерева сборки: тесты стали герметичными.
+4. `%PATH%` внутри одной строки `cmd` раскрывается до `call vcvars64`, поэтому `set PATH=<см>` затирал PATH компилятора. Теперь PATH дополняется в родительском процессе, а в скрипте — до входа в `cmd`.
+5. Пресет несёт `CMAKE_POLICY_VERSION_MINIMUM=3.5` не зря: сырой `cmake -S . -B ...` падает на `cmake_minimum_required` в enkiTS ещё до проверки Lua.

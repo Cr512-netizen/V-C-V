@@ -4,12 +4,13 @@
 #include "world/gen_resources.h"
 #include "sim/npc.h"
 #include "physics/body.h"
+#include "test_scratch.h"
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
 TEST_CASE("world save and load preserve deterministic state hash") {
  nuc::world::Chunk chunk(2,-1);chunk.set(1,2,3,7);chunk.set(31,31,31,4);nuc::save::WorldSaveData data;data.format_version=1;data.seed=987;data.chunks=nuc::save::WorldSave::encode_chunks({chunk});data.entities.push_back({42,"npc",1,2,3,{{5,8,64}},"crush",2});nuc::save::SavedCivilization civ;civ.id=7;civ.population=30;civ.resources[5]=120;civ.production_per_second[5]=3;civ.relations[9]=-3;civ.ticks_into_second=7;data.civilizations.push_back(civ);data.mod_state["core"]="{\"counter\":42}";
- auto path=std::filesystem::temp_directory_path()/"nuc_world_save_test.json";nuc::save::WorldSave::save(path,data);auto loaded=nuc::save::WorldSave::load(path);REQUIRE(loaded.hash()==data.hash());auto chunks=nuc::save::WorldSave::decode_chunks(loaded.chunks);REQUIRE(chunks.size()==1);REQUIRE(chunks[0].voxels()==chunk.voxels());std::filesystem::remove(path);
+ auto path=nuc::test::scratch_file("world_save_test.json");nuc::save::WorldSave::save(path,data);auto loaded=nuc::save::WorldSave::load(path);REQUIRE(loaded.hash()==data.hash());auto chunks=nuc::save::WorldSave::decode_chunks(loaded.chunks);REQUIRE(chunks.size()==1);REQUIRE(chunks[0].voxels()==chunk.voxels());std::filesystem::remove(path);
 }
 TEST_CASE("world save delta encoding handles ten thousand voxels") {
  nuc::world::Chunk chunk(-3,4);for(std::uint32_t i=0;i<10000;++i){const auto x=i%32;const auto y=(i/32)%32;const auto z=i/(32*32);chunk.set(x,y,z,(i%6)+1);}auto delta=nuc::save::WorldSave::encode_chunks({chunk});REQUIRE(delta[0].delta.size()==10000);auto restored=nuc::save::WorldSave::decode_chunks(delta);REQUIRE(restored[0].voxels()==chunk.voxels());
@@ -32,7 +33,7 @@ TEST_CASE("version 2 preserves ten thousand sparse voxel edits and canonical has
     for(int i=0;i<10000;++i)
         data.voxel_edits.push_back({i-5000,i%32,(i/32)-156,static_cast<std::uint32_t>(i%5)});
     const auto expected=data.voxel_edits;
-    const auto path=std::filesystem::temp_directory_path()/"nuc_world_save_v2_test.json";
+    const auto path=nuc::test::scratch_file("world_save_v2_test.json");
     nuc::save::WorldSave::save(path,data);
     const auto loaded=nuc::save::WorldSave::load(path);
     REQUIRE(loaded.format_version==2);
@@ -46,7 +47,7 @@ TEST_CASE("version 2 preserves ten thousand sparse voxel edits and canonical has
 TEST_CASE("version 2 save rejects duplicate and out of range edits") {
     nuc::save::WorldSaveData data;
     data.voxel_edits={{1,1,1,0},{1,1,1,4}};
-    const auto path=std::filesystem::temp_directory_path()/"nuc_world_save_duplicate_test.json";
+    const auto path=nuc::test::scratch_file("world_save_duplicate_test.json");
     REQUIRE_THROWS(nuc::save::WorldSave::save(path,data));
     data.voxel_edits={{1,32,1,4}};
     REQUIRE_THROWS(nuc::save::WorldSave::save(path,data));
@@ -59,7 +60,7 @@ TEST_CASE("version 1 chunk snapshot remains readable") {
     legacy.format_version=1;
     legacy.seed=77;
     legacy.chunks=nuc::save::WorldSave::encode_chunks({chunk});
-    const auto path=std::filesystem::temp_directory_path()/"nuc_world_save_v1_test.json";
+    const auto path=nuc::test::scratch_file("world_save_v1_test.json");
     nuc::save::WorldSave::save(path,legacy);
     const auto loaded=nuc::save::WorldSave::load(path);
     REQUIRE(loaded.format_version==1);
@@ -74,7 +75,7 @@ TEST_CASE("loaded sparse edits overlay generated base including explicit air") {
     nuc::save::WorldSaveData data;
     data.seed=42;
     data.voxel_edits={{1,1,1,0},{2,1,1,4}};
-    const auto path=std::filesystem::temp_directory_path()/"nuc_world_save_overlay_test.json";
+    const auto path=nuc::test::scratch_file("world_save_overlay_test.json");
     nuc::save::WorldSave::save(path,data);
     const auto loaded=nuc::save::WorldSave::load(path);
     nuc::world::ChunkManager::ChunkMap chunks;
@@ -91,7 +92,7 @@ TEST_CASE("loaded sparse edits overlay generated base including explicit air") {
 }
 
 TEST_CASE("version 2 loader rejects duplicate edits, invalid height and unknown version") {
-    const auto path=std::filesystem::temp_directory_path()/"nuc_world_save_invalid_test.json";
+    const auto path=nuc::test::scratch_file("world_save_invalid_test.json");
     const auto write=[&](const std::string& json){std::ofstream out(path,std::ios::trunc);out<<json;};
     const std::string suffix=R"("entities":[],"civilizations":[],"mod_state":{}})";
     write(R"({"version":2,"seed":1,"chunks":[],"voxel_edits":[{"x":1,"y":1,"z":1,"material":0},{"x":1,"y":1,"z":1,"material":4}],)" + suffix);
@@ -145,7 +146,7 @@ TEST_CASE("physics body ECS state survives world save and restore") {
     nuc::save::WorldSaveData data;
     data.seed=123;
     data.entities=nuc::save::WorldSave::capture_entities(source);
-    const auto path=std::filesystem::temp_directory_path()/"nuc_physics_body_save_test.json";
+    const auto path=nuc::test::scratch_file("physics_body_save_test.json");
     nuc::save::WorldSave::save(path,data);
     const auto loaded=nuc::save::WorldSave::load(path);
     nuc::ecs::World restored;

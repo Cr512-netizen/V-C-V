@@ -1,13 +1,14 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "world/registry.h"
+#include "test_scratch.h"
 #include <filesystem>
 #include <fstream>
 #include <string>
 
 namespace {
 struct Fixture {
-    std::filesystem::path root = std::filesystem::temp_directory_path() / "nuc_registry_tests";
+    std::filesystem::path root = nuc::test::scratch_dir("registry_tests");
     Fixture() { std::filesystem::create_directories(root); }
     std::filesystem::path write(const std::string& name, const std::string& text) {
         auto p = root / name; std::ofstream out(p); out << text; return p;

@@ -1,0 +1,123 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "NUC_BUILD_TESTS": "ON",
+        "USE_SYSTEM_LUA": "OFF",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
+      }
+    },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "displayName": "Debug with ASan/UBSan (GCC/Clang) and assertions",
+      "description": "Local development preset. Needed by ctest --preset debug.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NUC_ENABLE_SANITIZERS": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "displayName": "Release with optimisations, no sanitizers",
+      "description": "Performance preset for the 60 FPS target.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "NUC_ENABLE_SANITIZERS": "OFF"
+      }
+    },
+    {
+      "name": "windows-debug",
+      "inherits": "debug",
+      "displayName": "Debug on MSVC",
+      "description": "Run from a Developer PowerShell so cl.exe and ninja are on PATH. NUC_ENABLE_SANITIZERS is accepted but ignored: MSVC has no UBSan.",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-release",
+      "inherits": "release",
+      "displayName": "Release on MSVC",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-debug"
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 300
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 300
+      }
+    },
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 300
+      }
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 300
+      }
+    }
+  ]
+}

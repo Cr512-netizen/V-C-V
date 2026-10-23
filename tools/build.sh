@@ -1,4 +1,6 @@
 #!/usr/bin/env sh
+# Build with a CMake preset. Usage: tools/build.sh [debug|release]
 set -eu
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build --parallel
+preset="${1:-debug}"
+cmake --preset "$preset"
+cmake --build --preset "$preset" --parallel

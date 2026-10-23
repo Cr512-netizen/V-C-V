@@ -84,6 +84,16 @@ The first two items of the E.0 section in [`specs/05_phase.md`](specs/05_phase.m
 - `physics::fracture_seed(world_seed, tick, x, y, z)` is a pure splitmix64 mix of exactly those four values, replacing the previous seed that XORed a frame-derived counter. One test in `tests/test_destruction.cpp` asserts that the seed is stable, that every input (including coordinate sign) changes it, and that identical seeds yield byte-identical debris.
 - **Not implemented:** `DebrisPool::release` still has no caller, because choosing a debris lifetime or chunk-unload policy is a design decision the review has not made.
 
+## Phase B1 verification
+
+- Specification and review: [`specs/01_phase_b1.md`](specs/01_phase_b1.md).
+- One command per step, no manual `-D` flags: `cmake --preset windows-release`, `cmake --build --preset windows-release`, `ctest --preset windows-release`. Presets also exist for `debug`, `release` and `windows-debug`; `tools/build-windows.ps1` drives them from a plain shell by entering `vcvars64` itself, and `tools/build.sh` / `tools/test.sh` did the same for POSIX shells.
+- Lua 5.4.6 is vendored from a pinned URL with a locally computed SHA-256, compiled as `nuc_lua` from an explicit 32-file source list and exposed as `Lua::Lua`; `-DUSE_SYSTEM_LUA=ON` switches to `find_package(Lua 5.4)`, and without a system Lua it fails with CMake's standard `Could NOT find Lua (missing: LUA_LIBRARIES LUA_INCLUDE_DIR)` pointing at `cmake/lua.cmake:18` — the vendored path is the default and the only one verified here.
+- Windows MSVC **Release: 115/115 CTest passed**, **Debug: 115/115 passed**, Windows-only host, CMake 4.3.1 + Ninja from Visual Studio 18.
+- One-file incremental rebuild (touch `world/chunk.cpp`): **1.6 s**, well under the 20-second limit.
+- Two build-system bugs were found and fixed during the run: `FetchContent_Populate` publishes `<name>_SOURCE_DIR` into the calling scope, so wrapping it in a CMake function silently produced `/src/lapi.c` paths, and a `cmake_policy(PUSH)` left without its `POP` when a download failed replaced the real error with a bogus policy imbalance.
+- Fifteen tests failed on the first clean run for an environmental reason, not an engine one: they wrote scratch files to `%TEMP%`, and a sandboxed child process is confined to the workspace. They now use `tests/test_scratch.h` with `NUC_TEST_TMP_DIR` inside the build tree, which also makes them hermetic on CI runners.
+
 ## Windows build gate
 
 1. MSVC CMake configure — passed.

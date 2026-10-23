@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include "core/config.h"
+#include "test_scratch.h"
 #include <fstream>
 #include <filesystem>
 
@@ -9,7 +10,7 @@ TEST_CASE("config defaults simulation to 15 ticks per second") {
 }
 
 TEST_CASE("config parses values") {
- auto p = std::filesystem::temp_directory_path() / "nuc_config_test.toml";
+ auto p = nuc::test::scratch_file("nuc_config_test.toml");
  {
   std::ofstream f(p);
   f << "[window]\nwidth=900\nheight=600\nvsync=false\n[runtime]\ntick_rate=30\n";
@@ -23,7 +24,7 @@ TEST_CASE("config parses values") {
 }
 
 TEST_CASE("config selects the visible GL mesh renderer") {
- auto p = std::filesystem::temp_directory_path() / "nuc_config_renderer_test.toml";
+ auto p = nuc::test::scratch_file("nuc_config_renderer_test.toml");
  { std::ofstream f(p); f << "[render]\nrenderer = \"gl_mesh\"\n"; }
  const auto c = nuc::Config::load(p.string());
  REQUIRE(c.renderer == "gl_mesh");

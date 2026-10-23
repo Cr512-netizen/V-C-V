@@ -1,0 +1,18 @@
+# Google style with the settings this codebase actually uses.
+# 4-space indent and 120 columns match the existing sources; 80 would shred the
+# one-line function bodies that dominate the engine code.
+BasedOnStyle: Google
+Standard: c++20
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 120
+PointerAlignment: Left
+DerivePointerAlignment: false
+SortIncludes: CaseSensitive
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AllowShortLambdasOnASingleLine: All
+BreakBeforeBraces: Attach
+IncludeBlocks: Preserve
+AlignAfterOpenBracket: Align
