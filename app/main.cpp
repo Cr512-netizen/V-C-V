@@ -27,6 +27,7 @@
 #include "world/generator.h"
 #include "world/chunk_manager.h"
 #include "world/gen_resources.h"
+#include "world/parallel_chunks.h"
 #include "world/registry.h"
 #include <algorithm>
 #include <chrono>
@@ -96,9 +97,13 @@ int main() {
    }
    return it->second;
   };
-  for(std::int32_t z=-1;z<=1;++z) for(std::int32_t x=-1;x<=1;++x) (void)ensure_chunk(x,z);
+  std::vector<nuc::world::ChunkRequest> startup_requests;
+  for(std::int32_t z=-1;z<=1;++z) for(std::int32_t x=-1;x<=1;++x)
+   if(chunks.find(std::pair{x,z})==chunks.end()) startup_requests.push_back({x,z});
+  for(auto& chunk:nuc::world::generate_chunks(jobs,generator,resource_generator,save_data.seed,startup_requests))
+   chunks.emplace(std::pair{chunk.chunk_x(),chunk.chunk_z()},std::move(chunk));
   for(const auto& edit:save_data.voxel_edits) (void)ensure_chunk(chunk_coord(edit.x),chunk_coord(edit.z));
-  nuc::world::ChunkManager chunk_manager(chunks);
+  nuc::world::ChunkManager chunk_manager(chunks,&jobs);
   for(const auto& edit:save_data.voxel_edits) {
    const nuc::world::VoxelCoord position{edit.x,edit.y,edit.z};
    if(!chunk_manager.set_voxel(position,edit.material)&&chunk_manager.get_voxel(position)!=edit.material)

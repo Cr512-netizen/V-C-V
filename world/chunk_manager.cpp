@@ -1,7 +1,8 @@
 #include "world/chunk_manager.h"
 #include <algorithm>
 #include <chrono>
-
+#include <exception>
+#include <memory>
 #include <utility>
 
 namespace nuc::world {
@@ -91,18 +92,31 @@ void ChunkManager::rebuild_dirty_at_tick_end() {
         if(const auto* c=find_chunk(coord.first+1,coord.second)) east=overlay(*c);
         if(const auto* c=find_chunk(coord.first,coord.second-1)) north=overlay(*c);
         if(const auto* c=find_chunk(coord.first,coord.second+1)) south=overlay(*c);
+        auto build = [coord, revision, center=std::move(center), west=std::move(west), east=std::move(east),
+                      north=std::move(north), south=std::move(south)]() mutable {
+            render::ChunkNeighbors neighbors;
+            if(west) neighbors.west=west.get();
+            if(east) neighbors.east=east.get();
+            if(north) neighbors.north=north.get();
+            if(south) neighbors.south=south.get();
+            return MeshUpdate{coord,render::build_chunk_mesh(*center,neighbors),revision};
+        };
         try {
-            auto task=std::async(std::launch::async,
-                [coord,revision,center=std::move(center),west=std::move(west),east=std::move(east),
-                 north=std::move(north),south=std::move(south)]() mutable {
-                    render::ChunkNeighbors neighbors;
-                    if(west) neighbors.west=west.get();
-                    if(east) neighbors.east=east.get();
-                    if(north) neighbors.north=north.get();
-                    if(south) neighbors.south=south.get();
-                    return MeshUpdate{coord,render::build_chunk_mesh(*center,neighbors),revision};
+            if(jobs_!=nullptr) {
+                // Pool path: one queued task per chunk instead of one OS thread per chunk.
+                auto promise=std::make_shared<std::promise<MeshUpdate>>();
+                auto future=promise->get_future();
+                jobs_->submit([build=std::move(build),promise]() mutable {
+                    try {
+                        promise->set_value(build());
+                    } catch(...) {
+                        promise->set_exception(std::current_exception());
+                    }
                 });
-            pending_.push_back({coord,revision,std::move(task)});
+                pending_.push_back({coord,revision,std::move(future)});
+            } else {
+                pending_.push_back({coord,revision,std::async(std::launch::async,std::move(build))});
+            }
         } catch(...) {
             dirty_.insert(coord);
         }

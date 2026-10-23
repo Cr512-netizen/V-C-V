@@ -112,6 +112,16 @@ The first two items of the E.0 section in [`specs/05_phase.md`](specs/05_phase.m
 - `windows-release`: **134/134 CTest passed** (nine new W1–W9 cases). Nine starting chunks generate in **6 ms** against a 250 ms budget.
 - Two tuning facts worth keeping: the first tuned world put the spawn in water (16 green pixels in frame), fixed by `base_height` 12 → 14, `amplitude` 8 → 7, `sea_level` 10 → 8; and the camera had to move from `y = 18` to `y = 24` because it started inside the taller hills. Screenshot: [`specs/img/worldgen.png`](specs/img/worldgen.png).
 
+## Phase M verification (multithreading)
+
+- Specification: [`specs/04_parallel.md`](specs/04_parallel.md).
+- `core/jobs.*` grew from six minified lines into a real owner of the enkiTS scheduler: a fixed, clamped pool size, `parallel_for`, a `submit` that accepts move-only callables, `wait_idle`, and a destructor that waits for everything still running before the caller's captures die.
+- `world/parallel_chunks.*` generates a batch of chunks across the pool and returns them in request order, so callers never depend on thread count or completion order. Generation stayed a pure function of `(seed, world coordinates)`, which is what makes this safe at all.
+- `world/chunk_manager.*` now takes an optional `Jobs*`: mesh rebuilds are queued into the pool instead of spawning one `std::async` OS thread per dirty chunk. A boundary edit that dirties four chunks used to create four threads; it now creates four queued tasks. Without a pool the old path still works, which keeps existing tests untouched.
+- `windows-release`: **144/144 CTest passed**. Nine starting chunks: **4.55 ms on one worker, 1.60 ms on four** (2.8×).
+- Determinism holds across thread counts: 16 chunks generated in parallel are byte-identical to the sequential result, and `Jobs(1)` matches `Jobs(4)`.
+- Two API corrections found by the compiler, worth remembering: enkiTS v1.11 waits with `WaitforAll()`, not `WaitforAllTasks()`; and a pool task cannot be a `std::function<void()>` when it captures `std::unique_ptr`, so `submit` is a template that boxes the callable in a `std::shared_ptr`.
+
 ## Windows build gate
 
 1. MSVC CMake configure — passed.

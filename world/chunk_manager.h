@@ -1,4 +1,5 @@
 #pragma once
+#include "core/jobs.h"
 #include "render/chunk_mesh.h"
 #include "world/delta.h"
 #include <cstdint>
@@ -11,11 +12,12 @@
 
 namespace nuc::world {
 // Coordinates edits and CPU mesh rebuilds; GL uploads are drained on the render thread.
+// The optional Jobs pool is borrowed, not owned, and must outlive this manager.
 class ChunkManager final {
 public:
     using ChunkMap = std::map<std::pair<int,int>,Chunk>;
     struct MeshUpdate { std::pair<int,int> coord; render::ChunkMesh mesh; std::uint64_t revision{}; };
-    explicit ChunkManager(ChunkMap& chunks) : chunks_(chunks) {}
+    explicit ChunkManager(ChunkMap& chunks, nuc::Jobs* jobs = nullptr) : chunks_(chunks), jobs_(jobs) {}
     [[nodiscard]] std::uint32_t get_voxel(VoxelCoord position) const;
     bool set_voxel(VoxelCoord position, std::uint32_t material);
     void mark_dirty(VoxelCoord position);
@@ -32,6 +34,7 @@ private:
     [[nodiscard]] const Chunk* find_chunk(int x,int z) const;
     [[nodiscard]] std::unique_ptr<Chunk> overlay(const Chunk& base) const;
     ChunkMap& chunks_;
+    nuc::Jobs* jobs_{};
     VoxelDelta delta_;
     std::set<std::pair<int,int>> dirty_;
     std::map<std::pair<int,int>,std::uint64_t> revisions_;
