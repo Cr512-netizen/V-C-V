@@ -122,6 +122,13 @@ The first two items of the E.0 section in [`specs/05_phase.md`](specs/05_phase.m
 - Determinism holds across thread counts: 16 chunks generated in parallel are byte-identical to the sequential result, and `Jobs(1)` matches `Jobs(4)`.
 - Two API corrections found by the compiler, worth remembering: enkiTS v1.11 waits with `WaitforAll()`, not `WaitforAllTasks()`; and a pool task cannot be a `std::function<void()>` when it captures `std::unique_ptr`, so `submit` is a template that boxes the callable in a `std::shared_ptr`.
 
+## Repository and CI status (2026-10-23)
+
+- The project lives at [Cr512-netizen/V-C-V](https://github.com/Cr512-netizen/V-C-V) on `main`. The repository previously held three "Add files via upload" commits from 2026-10-22; they are preserved on the branch `backup/upload-2026-10-22`, and `main` now carries the real history from `707882f` (baseline, 115/115) to `bb208ee` (phase M).
+- Both workflows are green on `bb208ee`: [Linux, ASan/UBSan under Xvfb](https://github.com/Cr512-netizen/V-C-V/actions/runs/39944101682) and [Windows 11, MSVC](https://github.com/Cr512-netizen/V-C-V/actions/runs/39944101715).
+- Linux measured **144/144 CTest passed** in 15.44 s and a one-file incremental Ninja+ccache rebuild of **1 690 ms**, well under the 20-second rule. This closes the Linux sanitizer gap that had been open since phase D.
+- The two workflow files still pass flags the presets no longer need (`LUA_INCLUDE_DIR`, `LUA_LIBRARY`, and a hand-built Lua 5.4.8 while the tree vendors 5.4.6). CMake accepts them as unused cache variables, so CI is green, but the Windows job spends a step building a Lua library it never links. Cleaning that up is the first task of phase B2.
+
 ## Windows build gate
 
 1. MSVC CMake configure — passed.
