@@ -129,6 +129,14 @@ The first two items of the E.0 section in [`specs/05_phase.md`](specs/05_phase.m
 - Linux measured **144/144 CTest passed** in 15.44 s and a one-file incremental Ninja+ccache rebuild of **1 690 ms**, well under the 20-second rule. This closes the Linux sanitizer gap that had been open since phase D.
 - The two workflow files still pass flags the presets no longer need (`LUA_INCLUDE_DIR`, `LUA_LIBRARY`, and a hand-built Lua 5.4.8 while the tree vendors 5.4.6). CMake accepts them as unused cache variables, so CI is green, but the Windows job spends a step building a Lua library it never links. Cleaning that up is the first task of phase B2.
 
+## Windows installer (2026-10-23)
+
+- Specification: [`specs/06_installer.md`](specs/06_installer.md); script: [`installer/vcv.iss`](installer/vcv.iss).
+- CI now publishes a real setup program next to the portable ZIP: `choco install innosetup` on the runner, `ISCC.exe` with `StageDir`/`AppVersion`/`OutDir` defines, and a separate artifact `V-C-V-Installer-Windows-x64` kept for 30 days. The ZIP stays as the no-install option.
+- The installer is built **after** the CTest step in the same job, so a red test never publishes a new setup program. A following step then installs the produced file silently, checks `nuc_app.exe`, runs the uninstaller and fails if anything is left behind — producing a file is not the same as producing a usable installer.
+- `PrivilegesRequired=lowest`: the game installs into `%LOCALAPPDATA%\Programs\V-C-V` without UAC for the current user. `VersionInfoVersion` accepts only four numeric components, so the version is `0.1.0.<run_number>`.
+- Locally (Inno Setup 6.7.3): compile succeeds in 0.74 s and yields a 2.4 MB setup program with correct `ProductVersion`. Installing and uninstalling cannot be completed on this host: the sandbox denies child processes writes to the Start Menu and to `HKCU`, so the installer rolls back cleanly after copying 18 files. That path is covered by the CI smoke-install instead.
+
 ## Windows build gate
 
 1. MSVC CMake configure — passed.

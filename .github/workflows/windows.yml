@@ -92,3 +92,85 @@ jobs:
           path: Nuc-lVuc-l-Windows-x64.zip
           if-no-files-found: error
           retention-days: 14
+
+      # The installer is built only after the tests above passed, so a red test
+      # never publishes a new setup program. Inno Setup is not on windows-2022.
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $candidates = @(
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "C:\Program Files\Inno Setup 6\ISCC.exe",
+            (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe")
+          )
+          $find = { $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1 }
+          $iscc = & $find
+          if (-not $iscc) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { Write-Warning "choco install innosetup failed, falling back to the official installer" }
+            $iscc = & $find
+          }
+          if (-not $iscc) {
+            $setup = Join-Path $env:RUNNER_TEMP "innosetup.exe"
+            Invoke-WebRequest "https://files.jrsoftware.org/is/6/innosetup-6.2.2.exe" -OutFile $setup
+            Start-Process -FilePath $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+            $iscc = & $find
+          }
+          if (-not $iscc) { throw "ISCC.exe was not found in any known location" }
+          "Using $iscc"
+          (Get-Item $iscc).VersionInfo.ProductVersion
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "0.1.0.${{ github.run_number }}"
+          $stage = Join-Path $PWD "package-windows"
+          $out = Join-Path $PWD "dist"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $iscc = @(
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "C:\Program Files\Inno Setup 6\ISCC.exe",
+            (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe")
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { throw "ISCC.exe was not found" }
+          & $iscc "/DStageDir=$stage" "/DAppVersion=$version" "/DOutDir=$out" "installer\vcv.iss"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed with exit code $LASTEXITCODE" }
+          $installer = Join-Path $out "V-C-V-Setup-x64.exe"
+          if (-not (Test-Path $installer)) { throw "installer was not produced" }
+          $item = Get-Item $installer
+          "Installer: $($item.FullName) ($([math]::Round($item.Length / 1MB, 1)) MB, version $version)"
+          $item.VersionInfo | Format-List FileVersion, ProductVersion | Out-String | Write-Host
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: V-C-V-Installer-Windows-x64
+          path: dist/V-C-V-Setup-x64.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      # Producing a file is not the same as producing a usable installer, so the
+      # runner installs it silently and then uninstalls it again.
+      - name: Smoke-install the produced installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $target = Join-Path $env:RUNNER_TEMP "vcv-install-check"
+          $log = Join-Path $env:RUNNER_TEMP "vcv-install.log"
+          $setup = Join-Path $PWD "dist/V-C-V-Setup-x64.exe"
+          $proc = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/NOICONS", "/DIR=$target", "/LOG=$log" -Wait -PassThru
+          if ($proc.ExitCode -ne 0) {
+            Get-Content $log -ErrorAction SilentlyContinue | Select-Object -Last 40
+            throw "installer exited with code $($proc.ExitCode)"
+          }
+          $exe = Join-Path $target "nuc_app.exe"
+          if (-not (Test-Path $exe)) { throw "nuc_app.exe is missing after installation" }
+          "Installed $((Get-ChildItem $target -Recurse -File).Count) files into $target"
+          $uninstaller = Join-Path $target "unins000.exe"
+          if (-not (Test-Path $uninstaller)) { throw "uninstaller was not installed" }
+          $removal = Start-Process -FilePath $uninstaller -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
+          if ($removal.ExitCode -ne 0) { throw "uninstaller exited with code $($removal.ExitCode)" }
+          if (Test-Path $exe) { throw "uninstaller left nuc_app.exe behind" }
+          "Installer smoke test passed: install and uninstall are clean"

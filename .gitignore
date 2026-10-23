@@ -7,3 +7,5 @@ ccache/
 *.obj
 *.pdb
 *.save
+dist/
+package-windows/
