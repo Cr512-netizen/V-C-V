@@ -136,6 +136,7 @@ The first two items of the E.0 section in [`specs/05_phase.md`](specs/05_phase.m
 - The installer is built **after** the CTest step in the same job, so a red test never publishes a new setup program. A following step then installs the produced file silently, checks `nuc_app.exe`, runs the uninstaller and fails if anything is left behind — producing a file is not the same as producing a usable installer.
 - `PrivilegesRequired=lowest`: the game installs into `%LOCALAPPDATA%\Programs\V-C-V` without UAC for the current user. `VersionInfoVersion` accepts only four numeric components, so the version is `0.1.0.<run_number>`.
 - Locally (Inno Setup 6.7.3): compile succeeds in 0.74 s and yields a 2.4 MB setup program with correct `ProductVersion`. Installing and uninstalling cannot be completed on this host: the sandbox denies child processes writes to the Start Menu and to `HKCU`, so the installer rolls back cleanly after copying 18 files. That path is covered by the CI smoke-install instead.
+- Green on commit `d4e787a` ([Windows 39946955132](https://github.com/Cr512-netizen/V-C-V/actions/runs/39946955132), 368 s, all steps `success`): artifacts `V-C-V-Installer-Windows-x64` (1923 KB, 30 days) and `Nuc-lVuc-l-Windows-x64` (579 KB, 14 days); installer reports `0.1.0.3`; smoke-install put down 20 files and the uninstaller removed them.
 
 ## Windows build gate
 

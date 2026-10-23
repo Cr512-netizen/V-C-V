@@ -93,3 +93,21 @@
 из неэлевированной сессии завершается кодом 1 ещё до логирования. Переключил на
 `PrivilegesRequired=lowest` — игра ставится в `%LOCALAPPDATA%\Programs\V-C-V` без UAC, и
 установщик хотя бы доходит до шага ярлыков (что и видно в таблице выше).
+
+### 6.2. Прогон CI (2026-10-23, коммит `d4e787a`)
+
+[Windows 11 build #39946955132](https://github.com/Cr512-netizen/V-C-V/actions/runs/39946955132) —
+все шаги `success`, Linux [CMake CI #39946955022](https://github.com/Cr512-netizen/V-C-V/actions/runs/39946955022)
+в том же коммите тоже зелёный (235 с).
+
+| Что проверили | Итог |
+|---|---|
+| Поиск компилятора | `Using C:\Program Files (x86)\Inno Setup 6\ISCC.exe` — ветка `choco install` сработала, фолбэк не понадобился |
+| Компиляция на раннере | `Successful compile (1.329 sec)` |
+| Размер и версия | 2.4 МБ, `FileVersion` = `ProductVersion` = `0.1.0.3` |
+| Молчаливая установка | `Installed 20 files into D:\a\_temp\vcv-install-check` |
+| Деинсталляция | `Installer smoke test passed: install and uninstall are clean` |
+| Артефакты | `V-C-V-Installer-Windows-x64` — **1923 КБ**, хранится до 2026-11-22; портативный ZIP рядом, 579 КБ |
+
+Шаг установки дал 20 файлов против 18 локально: на раннере добавились ярлык в «Пуск» и запись
+деинсталлятора, которых песочница не дала создать на этой машине.
